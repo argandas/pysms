@@ -3,23 +3,22 @@ import serial
 
 
 class SIM900:
-    def __init__(self):
-        self.port = None
-        self.serial = None
+    def __init__(self, serial_handler=None):
+        self.serial = serial_handler or serial.Serial()
 
     def __del__(self):
         if self.serial is not None:
-            if self.serial.is_open:
-                self.serial.close()
+            self.serial.close()
 
-    def open(self, port=None, baud=9600, timeout=100):
-        if port is not None:
-            self.port = port
-            self.serial = serial.Serial(self.port, baud, timeout=timeout)
+    def open(self, port, baud=9600, timeout=100):
+        self.serial.port = port
+        self.serial.baudrate = baud
+        self.serial.timeout = timeout
+        self.serial.open()
 
     def send(self, data):
         encoded_data = data.encode('utf-8')
-        print("\r\n\t[TX] bytes = ", encoded_data, "len = ", len(encoded_data))
+        # print("\r\n\t[TX] bytes = ", encoded_data, "len = ", len(encoded_data))
         return self.serial.write(encoded_data)
 
     def close(self):
@@ -39,5 +38,5 @@ class SIM900:
     def __waitfor(self, regexp, timeout):
         data = b""
         data = self.serial.readline()
-        print("\r\n\t[RX] bytes = ", data, "len = ", len(data))
+        # print("\r\n\t[RX] bytes = ", data, "len = ", len(data))
         return data
