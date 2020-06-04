@@ -1,0 +1,21 @@
+# AT commands
+CMD_AT = "AT"
+CMD_OK = "(^OK$)"
+CMD_ERROR = "(^ERROR$)"
+CMD_CMGF = "AT+CMGF?"
+CMD_CMGF_SET = "AT+CMGF=%s"
+CMD_CMGF_REGEXP = "(^[+]CMGF[:] [0-9]+$)"
+CMD_CMGF_RX = "+CMGF: "
+CMD_CTRL_Z = "\x1A"
+CMD_CMGS = "AT+CMGS=\"%s\""
+CMD_CMGS_RX_REGEXP = "(^[+]CMGS[:] [0-9]+$)"
+CMD_CMGD = "AT+CMGD=%s"
+CMD_CMGR = "AT+CMGR=%s"
+CMD_CMGR_REGEXP = "(^[+]CMGR[:] .*)"
+CMD_CMGR_RX = "+CMGR: "
+CMD_CMTI_REGEXP = "(^[+]CMTI[:] \"SM\",[0-9]+$)"
+CMD_CMTI_RX = "+CMTI: \"SM\","
+
+# SMS Message Format
+PDU_MODE = "0"
+TEXT_MODE = "1"
