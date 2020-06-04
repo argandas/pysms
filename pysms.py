@@ -1,4 +1,4 @@
-from pysms import at_commands as at
+import at_commands as at
 import serial
 
 
