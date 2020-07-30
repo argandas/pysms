@@ -1,21 +1,35 @@
+import re
+
+
 # AT commands
-CMD_AT = "AT"
-CMD_OK = "(^OK$)"
-CMD_ERROR = "(^ERROR$)"
-CMD_CMGF = "AT+CMGF?"
-CMD_CMGF_SET = "AT+CMGF=%s"
-CMD_CMGF_REGEXP = "(^[+]CMGF[:] [0-9]+$)"
 CMD_CMGF_RX = "+CMGF: "
-CMD_CTRL_Z = "\x1A"
-CMD_CMGS = "AT+CMGS=\"%s\""
-CMD_CMGS_RX_REGEXP = "(^[+]CMGS[:] [0-9]+$)"
-CMD_CMGD = "AT+CMGD=%s"
-CMD_CMGR = "AT+CMGR=%s"
-CMD_CMGR_REGEXP = "(^[+]CMGR[:] .*)"
 CMD_CMGR_RX = "+CMGR: "
-CMD_CMTI_REGEXP = "(^[+]CMTI[:] \"SM\",[0-9]+$)"
 CMD_CMTI_RX = "+CMTI: \"SM\","
 
+# Special commands
+CMD_CTRL_Z = "\x1A"
+CMD_EOL = "\r\n"
+
+# AT Write/Set Commands
+AT_PING = "AT"
+AT_ECHO = "ATE {value}"
+AT_CMGF = "AT+CMGF={mode}"
+AT_CMGS = "AT+CMGS=\"{address}\""
+AT_CMGR = "AT+CMGR={index}"
+AT_CMGD = "AT+CMGD={index}"
+AT_CMEE = "AT+CMEE={n}"
+
+# Queries
+QUERY_CMGF = "AT+CMGF?"
+
+# Regular Expressions
+RE_OK = re.compile("(^OK$)")
+RE_ERROR = re.compile("(^ERROR$)|(^[+]CM[E,S] ERROR:.*$)")
+RE_CMGF = re.compile("(^[+]CMGF[:] [0-9]+$)")
+RE_CMTI = re.compile("(^[+]CMTI[:] \"SM\",[0-9]+$)")
+RE_CMGR = re.compile("(^[+]CMGR[:] .*)")
+RE_CMGS = re.compile("(^[+]CMGS[:] [0-9]+$)")
+
 # SMS Message Format
-PDU_MODE = "0"
-TEXT_MODE = "1"
+SMS_MODE_PDU = 0
+SMS_MODE_TEXT = 1
