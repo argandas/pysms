@@ -1,13 +1,14 @@
-import at_commands as at
+import at_commands as AT
 import serial
 import time
-import multiprocessing
+import re
 
 
 class SERIAL_GSM_MODEM:
 
     def __init__(self, serial_handler=None, debug=False):
         self.serial = serial_handler or serial.Serial()
+        self.serial.timeout = 1
         self.debug = debug
 
     def __del__(self):
@@ -23,42 +24,57 @@ class SERIAL_GSM_MODEM:
     def close(self):
         self.serial.close()
 
-    def send(self, data):
+    def send(self, data: str):
         return self.write(data.encode('utf-8'))
 
-    def send_and_wait(self, command, pattern):
-        data = ""
-        if self.debug:
-            print(f"[CMD] {command}")
-        if len(command) <= self.send(command + at.CMD_EOL):
-            time.sleep(0.1)
-            data = self.wait_for_pattern(pattern)
-        return data
+    def send_command(self, command, pattern=None, timeout=100):
+        response = None
+        self.send(command)
+        if pattern:
+            response = self.wait_for(pattern, timeout=timeout)
+        if not self.wait_for(AT.RE_OK, timeout=timeout):
+            raise Exception(f"Missing closure for command: {command}")
+        return response
 
     def write(self, data_bytes):
         if self.debug:
-            print(f"\t[TX] bytes = {data_bytes} len = {len(data_bytes)}")
+            print(f"   [TX] {data_bytes}")
         return self.serial.write(data_bytes)
 
-    def wait_for_pattern(self, pattern):
-        while self.serial.in_waiting:
-            data = self.serial.readline()
+    def wait_for(self, pattern, timeout=100):
+        line_found = False
+        retry = 0
+        line = b""
+        while retry < timeout:
+            while self.serial.in_waiting:
+                c = self.serial.read()
+                if c == b'\r':
+                    continue
+                if c == b'\n':
+                    line_found = True
+                    break
+                line += c
 
-            decoded = data.decode("utf-8")
-            if len(decoded) >= 2:
-                decoded = decoded[:len(decoded)-2]
+            new_line = line.decode("utf-8")
 
-            if self.debug:
-                print(f"\t[RX] bytes = {data}, len = {len(data)}")
+            if self.debug and len(line) > 0:
+                print(f"   [RX] {line}")
 
-            if pattern.match(decoded):
+            if pattern.match(new_line):
                 if self.debug:
-                    print(f"\t[RE] Pattern match = {decoded}")
-                return decoded
-            elif at.RE_ERROR.match(decoded):
-                raise Exception(decoded)
+                    print(f"   [RE] Pattern match = {new_line}\r\n")
+                return new_line
+            elif AT.RE_ERROR.match(new_line):
+                raise Exception(new_line)
 
-        return ""
+            if line_found:
+                line_found = False
+                line = b""
+
+            time.sleep(0.1)
+            retry += 1
+
+        return None
 
 
 class SIMXXX(SERIAL_GSM_MODEM):
@@ -67,48 +83,63 @@ class SIMXXX(SERIAL_GSM_MODEM):
         self.open(port=port, baud=baud)
 
     def ping(self):
-        return self.send_and_wait(
-            at.AT_PING,
-            at.RE_OK
-        )
+        return self.send_command(AT.PING.execute())
 
-    def echo(self, echo=True):
-        return self.send_and_wait(
-            at.AT_ECHO.format(value=1 if echo else 0),
-            at.RE_OK
-        )
+    def set_echo(self, echo=True):
+        return self.send_command(AT.ECHO.write({"value": 1 if echo else 0}))
 
-    def set_sms_format(self, sms_mode=at.SMS_MODE_TEXT):
-        return self.send_and_wait(
-            at.AT_CMGF.format(mode=sms_mode),
-            at.RE_OK
-        )
+    def set_sms_format(self, sms_mode):
+        return self.send_command(AT.CMGF.write({"mode": sms_mode}))
 
     def set_error_verbose(self, level):
-        return self.send_and_wait(
-            at.AT_CMEE.format(n=level),
-            at.RE_OK
-        )
+        return self.send_command(AT.CMEE.write({"n": level}))
+
+    def get_signal_quality(self):
+        return self.send_command(AT.CSQ.execute(), pattern=AT.CSQ.regexp())
 
 
 class PYSMS:
-    def __init__(self, sim=None, port="COM1", baud=9600):
-        self.sim = sim or SIMXXX(port=port, baud=baud, debug=True)
-        self.sim.echo(False)
+    def __init__(self, sim=None, port="COM1", baud=9600, debug=False):
+        self.sim = sim or SIMXXX(port=port, baud=baud, debug=debug)
+        self.sim.ping()
+        self.sim.set_echo(False)
         self.sim.set_error_verbose(2)
+        self.sim.send_command(AT.CREG.read(), pattern=AT.CREG.regexp())
+        self.sim.send_command(AT.CCID.execute(), pattern=AT.CCID.regexp())
+        self.sim.send_command(AT.COPS.read(), pattern=AT.COPS.regexp())
+        self.sim.get_signal_quality()
 
     def __del__(self):
         self.sim.close()
 
-    def send_sms(self, addr, message):
-        self.sim.set_sms_format(at.SMS_MODE_TEXT)
-        self.sim.send(at.AT_CMGS.format(address=addr) + at.CMD_EOL)
-        self.sim.send_and_wait(message + at.CMD_CTRL_Z, at.RE_CMGS)
+    def send_sms(self, addr, msg):
+        # Set text mode
+        self.sim.set_sms_format(1)
+
+        # Request to send SMS
+        self.sim.send(AT.CMGS.write({"address": f"\"{addr}\""}))
+
+        # Wait for indicator
+        if self.sim.wait_for(re.compile("(^>.*)")):
+            # Send message and terminate with CTRL+Z
+            self.sim.send_command(msg + AT.CTRL_Z, pattern=AT.CMGS.regexp())
+
+    def passtrough(self):
+        while 1:
+            data = input()
+            if data == "CTRL+Z":
+                self.sim.send(AT.CTRL_Z)
+            elif data == "exit":
+                break
+            elif data != "":
+                self.sim.send_command(data + AT.AT_EOL)
 
 
-pysms = PYSMS(port="COM9")
+pysms = PYSMS(port="COM9", baud=115200, debug=True)
 try:
-    pysms.send_sms("3323436739", "Hello world SMS!")
+    gsn = pysms.sim.send_command(AT.GSN.execute(), pattern=AT.GSN.regexp())
+    pysms.send_sms("+523323436739", f"IMEI: {gsn}")
+    # pysms.passtrough()
 except Exception as e:
     print(f"Exception found: {e}")
 finally:
