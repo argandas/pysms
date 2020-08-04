@@ -42,39 +42,59 @@ class SERIAL_GSM_MODEM:
         return self.serial.write(data_bytes)
 
     def wait_for(self, pattern, timeout=100):
+        pattern_found = False
+        result = None
         line_found = False
         retry = 0
         line = b""
         while retry < timeout:
-            while self.serial.in_waiting:
-                c = self.serial.read()
-                if c == b'\r':
-                    continue
-                if c == b'\n':
-                    line_found = True
-                    break
-                line += c
+            line_found, line = self.readline(line)
 
-            new_line = line.decode("utf-8")
+            # Decode byte string
+            decoded_line = line.decode("utf-8")
 
-            if self.debug and len(line) > 0:
-                print(f"   [RX] {line}")
-
-            if pattern.match(new_line):
+            if pattern.match(decoded_line):
+                ''' Search for pattern '''
                 if self.debug:
-                    print(f"   [RE] Pattern match = {new_line}\r\n")
-                return new_line
-            elif AT.RE_ERROR.match(new_line):
-                raise Exception(new_line)
+                    print(f"   [RE] Pattern match = {decoded_line}\r\n")
+                pattern_found = True
+                result = decoded_line
+                break
+            elif AT.RE_ERROR.match(decoded_line):
+                """ Search for errors """
+                raise Exception(decoded_line)
+            # Retry
+            else:
+                if line_found:
+                    line = b""
+                time.sleep(0.1)
+                retry += 1
 
-            if line_found:
-                line_found = False
-                line = b""
+        return (pattern_found, result)
 
-            time.sleep(0.1)
-            retry += 1
+    def readlines(self):
+        print("Hello timer!")
+        """
+        while self.serial.in_waiting:
+            for line in self.serial.readlines():
+                self.queue.append(line)
+        """
 
-        return None
+    def readline(self, line, timeout=100):
+        line_found = False
+        while self.serial.in_waiting:
+            c = self.serial.read()
+            if c == b'\r':
+                continue
+            if c == b'\n':
+                line_found = True
+                break
+            line += c
+
+        if self.debug and len(line) > 0:
+            print(f"   [RX] {line}")
+
+        return (line_found, line)
 
 
 class SIMXXX(SERIAL_GSM_MODEM):
@@ -104,7 +124,15 @@ class PYSMS:
         self.sim.ping()
         self.sim.set_echo(False)
         self.sim.set_error_verbose(2)
-        self.sim.send_command(AT.CREG.read(), pattern=AT.CREG.regexp())
+        found, creg_rsp = self.sim.send_command(
+            AT.CREG.read(),
+            pattern=AT.CREG.regexp()
+        )
+
+        if found:
+            data = AT.CREG.parse(creg_rsp)
+            print(data)
+
         self.sim.send_command(AT.CCID.execute(), pattern=AT.CCID.regexp())
         self.sim.send_command(AT.COPS.read(), pattern=AT.COPS.regexp())
         self.sim.get_signal_quality()
@@ -122,7 +150,14 @@ class PYSMS:
         # Wait for indicator
         if self.sim.wait_for(re.compile("(^>.*)")):
             # Send message and terminate with CTRL+Z
-            self.sim.send_command(msg + AT.CTRL_Z, pattern=AT.CMGS.regexp())
+            found, rsp = self.sim.send_command(
+                msg + AT.CTRL_Z,
+                pattern=AT.CMGS.regexp()
+            )
+
+            if found:
+                data = AT.CMGS.parse(rsp)
+                print(data)
 
     def passtrough(self):
         while 1:
@@ -137,7 +172,7 @@ class PYSMS:
 
 pysms = PYSMS(port="COM9", baud=115200, debug=True)
 try:
-    gsn = pysms.sim.send_command(AT.GSN.execute(), pattern=AT.GSN.regexp())
+    _, gsn = pysms.sim.send_command(AT.GSN.execute(), pattern=AT.GSN.regexp())
     pysms.send_sms("+523323436739", f"IMEI: {gsn}")
     # pysms.passtrough()
 except Exception as e:
