@@ -72,14 +72,6 @@ class SERIAL_GSM_MODEM:
 
         return (pattern_found, result)
 
-    def readlines(self):
-        print("Hello timer!")
-        """
-        while self.serial.in_waiting:
-            for line in self.serial.readlines():
-                self.queue.append(line)
-        """
-
     def readline(self, line, timeout=100):
         line_found = False
         while self.serial.in_waiting:
@@ -117,6 +109,20 @@ class SIMXXX(SERIAL_GSM_MODEM):
     def get_signal_quality(self):
         return self.send_command(AT.CSQ.execute(), pattern=AT.CSQ.regexp())
 
+    def is_registered(self):
+        stat = 0
+
+        found, creg_rsp = self.send_command(
+            AT.CREG.read(),
+            pattern=AT.CREG.regexp()
+        )
+
+        if found:
+            data = AT.CREG.parse(creg_rsp)
+            stat = data["stat"]
+
+        return True if found and stat == 1 else False
+
 
 class PYSMS:
     def __init__(self, sim=None, port="COM1", baud=9600, debug=False):
@@ -124,15 +130,6 @@ class PYSMS:
         self.sim.ping()
         self.sim.set_echo(False)
         self.sim.set_error_verbose(2)
-        found, creg_rsp = self.sim.send_command(
-            AT.CREG.read(),
-            pattern=AT.CREG.regexp()
-        )
-
-        if found:
-            data = AT.CREG.parse(creg_rsp)
-            print(data)
-
         self.sim.send_command(AT.CCID.execute(), pattern=AT.CCID.regexp())
         self.sim.send_command(AT.COPS.read(), pattern=AT.COPS.regexp())
         self.sim.get_signal_quality()
@@ -141,23 +138,22 @@ class PYSMS:
         self.sim.close()
 
     def send_sms(self, addr, msg):
-        # Set text mode
-        self.sim.set_sms_format(1)
+        sent = False
+        if self.sim.is_registered():
+            # Set text mode
+            self.sim.set_sms_format(1)
+            # Request to send SMS.
+            self.sim.send(AT.CMGS.write({"address": f"\"{addr}\""}))
+            # Wait for indicator
+            if self.sim.wait_for(re.compile("(^>.*)")):
+                # Send message and terminate with CTRL+Z
+                found, _ = self.sim.send_command(
+                    msg + AT.CTRL_Z,
+                    pattern=AT.CMGS.regexp()
+                )
 
-        # Request to send SMS
-        self.sim.send(AT.CMGS.write({"address": f"\"{addr}\""}))
-
-        # Wait for indicator
-        if self.sim.wait_for(re.compile("(^>.*)")):
-            # Send message and terminate with CTRL+Z
-            found, rsp = self.sim.send_command(
-                msg + AT.CTRL_Z,
-                pattern=AT.CMGS.regexp()
-            )
-
-            if found:
-                data = AT.CMGS.parse(rsp)
-                print(data)
+                sent = found
+        return sent
 
     def passtrough(self):
         while 1:
@@ -168,14 +164,3 @@ class PYSMS:
                 break
             elif data != "":
                 self.sim.send_command(data + AT.AT_EOL)
-
-
-pysms = PYSMS(port="COM9", baud=115200, debug=True)
-try:
-    _, gsn = pysms.sim.send_command(AT.GSN.execute(), pattern=AT.GSN.regexp())
-    pysms.send_sms("+523323436739", f"IMEI: {gsn}")
-    # pysms.passtrough()
-except Exception as e:
-    print(f"Exception found: {e}")
-finally:
-    del pysms
