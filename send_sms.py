@@ -22,6 +22,17 @@ def main(argv):
     addr = ''
     msg = ''
     debug = False
+
+    def print_usage():
+        print('Usage:')
+        print('\t-a, --addr\t: Destination address of the SMS')
+        print('\t-m, --msg \t: Message to send')
+        print('\t-d        \t: Enable AT commands debug')
+        print('\r\nExamples:')
+        print('\tsend_sms.py -a <addr> -m <msg>')
+        print('\tsend_sms.py --addr=<addr> --msg=<msg>')
+        print('\tsend_sms.py -d -a <addr> -m <msg>')
+
     try:
         opts, _ = getopt.getopt(
             argv,
@@ -29,11 +40,12 @@ def main(argv):
             ["addr=", "msg="]
         )
     except getopt.GetoptError:
-        print('example.py -a <addr> -m <msg> -d')
+        print('ERROR: Invalid syntax')
+        print_usage()
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('example.py -a <addr> -m <msg> -d')
+            print_usage()
             sys.exit()
         elif opt in ("-d"):
             debug = True
