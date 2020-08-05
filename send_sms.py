@@ -3,8 +3,8 @@ import sys
 import getopt
 
 
-def sendsms(address, message, debug):
-    pysms = PYSMS(port="COM9", baud=115200, debug=debug)
+def sendsms(port, address, message, debug):
+    pysms = PYSMS(port=port, baud=115200, debug=debug)
     try:
         print(f"Send SMS: addr=\"{address}\", msg=\"{message}\"")
         if pysms.send_sms(address, message):
@@ -20,11 +20,13 @@ def sendsms(address, message, debug):
 
 def main(argv):
     addr = ''
+    port = ''
     msg = ''
     debug = False
 
     def print_usage():
         print('Usage:')
+        print('\t-p, --port\t: Serial port to use')
         print('\t-a, --addr\t: Destination address of the SMS')
         print('\t-m, --msg \t: Message to send')
         print('\t-d        \t: Enable AT commands debug')
@@ -36,8 +38,8 @@ def main(argv):
     try:
         opts, _ = getopt.getopt(
             argv,
-            "hda:m:",
-            ["addr=", "msg="]
+            "hda:m:p:",
+            ["addr=", "msg=", "port="]
         )
     except getopt.GetoptError:
         print('ERROR: Invalid syntax')
@@ -53,8 +55,10 @@ def main(argv):
             addr = arg
         elif opt in ("-m", "--msg"):
             msg = arg
+        elif opt in ("-p", "--port"):
+            port = arg
 
-    sendsms(addr, msg, debug)
+    sendsms(port, addr, msg, debug)
 
 
 if __name__ == "__main__":

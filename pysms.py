@@ -32,8 +32,11 @@ class SERIAL_GSM_MODEM:
         self.send(command)
         if pattern:
             response = self.wait_for(pattern, timeout=timeout)
-        if not self.wait_for(AT.RE_OK, timeout=timeout):
+        ok_message = self.wait_for(AT.RE_OK, timeout=timeout)
+        if "OK" not in ok_message:
             raise Exception(f"Missing closure for command: {command}")
+        if not pattern:
+            response = ok_message
         return response
 
     def write(self, data_bytes):
@@ -127,12 +130,14 @@ class SIMXXX(SERIAL_GSM_MODEM):
 class PYSMS:
     def __init__(self, sim=None, port="COM1", baud=9600, debug=False):
         self.sim = sim or SIMXXX(port=port, baud=baud, debug=debug)
-        self.sim.ping()
-        self.sim.set_echo(False)
-        self.sim.set_error_verbose(2)
-        self.sim.send_command(AT.CCID.execute(), pattern=AT.CCID.regexp())
-        self.sim.send_command(AT.COPS.read(), pattern=AT.COPS.regexp())
-        self.sim.get_signal_quality()
+        if "OK" in self.sim.ping():
+            self.sim.set_echo(False)
+            self.sim.set_error_verbose(2)
+            self.sim.send_command(AT.CCID.execute(), pattern=AT.CCID.regexp())
+            self.sim.send_command(AT.COPS.read(), pattern=AT.COPS.regexp())
+            self.sim.get_signal_quality()
+        else:
+            raise Exception("Failed to ping the SIM Module")
 
     def __del__(self):
         self.sim.close()
@@ -153,6 +158,8 @@ class PYSMS:
                 )
 
                 sent = found
+        else:
+            raise Exception("The SIM module is not registered in the network")
         return sent
 
     def passtrough(self):
