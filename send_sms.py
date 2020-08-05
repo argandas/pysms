@@ -6,7 +6,7 @@ import getopt
 def sendsms(address, message, debug):
     pysms = PYSMS(port="COM9", baud=115200, debug=debug)
     try:
-        print(f"Send SMS: addr = {address}, msg = {message}")
+        print(f"Send SMS: addr=\"{address}\", msg=\"{message}\"")
         if pysms.send_sms(address, message):
             print("OK")
         else:
