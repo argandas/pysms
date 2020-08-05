@@ -40,9 +40,12 @@ class SERIAL_GSM_MODEM:
         return response
 
     def write(self, data_bytes):
-        if self.debug:
-            print(f"   [TX] {data_bytes}")
-        return self.serial.write(data_bytes)
+        if self.serial.is_open:
+            if self.debug:
+                print(f"   [TX] {data_bytes}")
+            return self.serial.write(data_bytes)
+        else:
+            raise Exception("ERROR: Serial port is not open")
 
     def wait_for(self, pattern, timeout=100):
         pattern_found = False
