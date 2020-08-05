@@ -15,16 +15,16 @@ $ pip install -r requirements.txt
 
 To send an SMS execute `send_sms.py` with the following syntax:
 ```
-$ python .\send_sms.py -a "your_phone_number" -m "message"
+$ python .\send_sms.py -p "COM1" -a "your_phone_number" -m "message"
 ```
 or
 ```
-$ python .\send_sms.py --addr="your_phone_number" --msg="message"
+$ python .\send_sms.py --port="COM1" --addr="your_phone_number" --msg="message"
 ```
 
 Optional argument `d` allows the user to debug the AT command traffic of the SIM module:
  ```
-$ python .\send_sms.py -d -a "your_phone_number" -m "message"
+$ python .\send_sms.py -d  -p "COM1" -a "your_phone_number" -m "message"
 ```
 
 
