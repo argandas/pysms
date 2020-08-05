@@ -3,6 +3,14 @@
 
 Python Code for sensing SMS using SIM900 modem
 
+## Dependencies
+
+In order to get all necessary Python modules, please execute the following command inside the repo folder:
+```
+$ pip install --upgrade pip
+$ pip install -r requirements.txt
+```
+
 ## Usage
 
 To send an SMS execute `send_sms.py` with the following syntax:
